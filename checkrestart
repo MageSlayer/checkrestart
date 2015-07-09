@@ -74,6 +74,7 @@ import pwd
 import sys
 import string
 import subprocess
+import getopt
 
 if os.getuid() != 0:
     sys.stderr.write('This program must be run as root\n')
@@ -124,6 +125,45 @@ def portage_fQuery(programs, packages):
 
     return 0
 
+def Usage():
+    sys.stderr.write('usage: checkrestart [-hx]\n')
+    sys.stderr.write('  -h, --help    - show help text\n')
+    sys.stderr.write('  -x, --execute - restart init scripts\n')
+
+def ProcessOpts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hx", ["help", "execute"])
+    except getopt.GetoptError, err:
+        # print help information and exit
+        print str(err)
+        Usage()
+        sys.exit(2)
+
+    # Global variables set through the command line
+    global OptExecute
+    OptExecute = False
+
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            Usage()
+            sys.exit()
+        elif o in ("-x", "--execute"):
+            OptExecute = True
+        else:
+            assert False, "unhandled option"
+
+def ExecuteCmds(restartCommands):
+    for cmd in restartCommands:
+        print "Executing %s" % cmd
+        p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+        while True:
+            out = p.stderr.read(1)
+            if out == '' and p.poll() != None:
+                break
+                if out != '':
+                    sys.stdout.write(out)
+                    sys.stdout.flush()
+            
 #
 # Distribution Detection
 #
@@ -157,6 +197,8 @@ def main():
     process = None
     toRestart = {}
 
+    ProcessOpts()
+    
     toRestart = lsofcheck()
 # Check if we have lsof, if not, use psdel
 #    if find_cmd('lsof'):
@@ -243,6 +285,9 @@ def main():
         print '\n'.join(restartCommands)
         print
 
+        if OptExecute:
+            ExecuteCmds(restartCommands)
+        
     if len(nonrestartable) == 0:
         sys.exit(0)
 
